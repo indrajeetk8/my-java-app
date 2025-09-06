@@ -1,0 +1,35 @@
+{
+  "baseUrl": "https://prod.myapp.com",
+  "testType": "smoke",
+  "options": {
+    "stages": [
+      { "duration": "30s", "target": 1 },
+      { "duration": "1m", "target": 1 },
+      { "duration": "30s", "target": 0 }
+    ],
+    "thresholds": {
+      "http_req_duration": ["p(95)<300"],
+      "http_req_failed": ["rate<0.05"],
+      "errors": ["count<5"]
+    }
+  },
+  "environment": "production",
+  "maxVirtualUsers": 5,
+  "testDuration": "2m",
+  "rampUpTime": "30s",
+  "rampDownTime": "30s",
+  "smokeTest": {
+    "enabled": true,
+    "description": "Minimal production smoke test to verify basic functionality"
+  },
+  "loadTest": {
+    "enabled": false,
+    "requiresApproval": true,
+    "description": "Full load test - requires manual approval for production"
+  },
+  "monitoring": {
+    "alertOnFailure": true,
+    "notificationChannels": ["#alerts", "#devops"],
+    "maxAllowedErrors": 3
+  }
+}

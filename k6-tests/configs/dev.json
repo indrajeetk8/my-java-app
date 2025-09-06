@@ -1,0 +1,21 @@
+{
+  "baseUrl": "http://localhost:8080",
+  "testType": "load",
+  "options": {
+    "stages": [
+      { "duration": "1m", "target": 5 },
+      { "duration": "3m", "target": 5 },
+      { "duration": "1m", "target": 0 }
+    ],
+    "thresholds": {
+      "http_req_duration": ["p(95)<1000"],
+      "http_req_failed": ["rate<0.15"],
+      "errors": ["count<20"]
+    }
+  },
+  "environment": "development",
+  "maxVirtualUsers": 10,
+  "testDuration": "5m",
+  "rampUpTime": "1m",
+  "rampDownTime": "1m"
+}

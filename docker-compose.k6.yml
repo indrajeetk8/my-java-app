@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  k6:
+    image: grafana/k6:latest
+    container_name: k6-runner
+    volumes:
+      - ./k6-tests:/k6-tests
+      - ./k6-tests/results:/k6-tests/results
+    environment:
+      - BASE_URL=${K6_BASE_URL:-http://my-java-app:8080}
+      - TEST_TYPE=${K6_TEST_TYPE:-load}
+      - ENVIRONMENT=${K6_ENVIRONMENT:-dev}
+    command: >
+      run 
+      --out json=/k6-tests/results/results.json
+      --out summary=/k6-tests/results/summary.txt
+      /k6-tests/scripts/${K6_TEST_TYPE:-load}-test.js
+    depends_on:
+      - my-java-app
+    networks:
+      - k6-network
+
+  # Optional: Grafana for k6 results visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: k6-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./k6-tests/grafana:/etc/grafana/provisioning
+    networks:
+      - k6-network
+    profiles:
+      - monitoring
+
+  # Optional: InfluxDB for k6 metrics storage
+  influxdb:
+    image: influxdb:1.8
+    container_name: k6-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - INFLUXDB_DB=k6
+      - INFLUXDB_USER=k6
+      - INFLUXDB_USER_PASSWORD=k6
+    volumes:
+      - influxdb_data:/var/lib/influxdb
+    networks:
+      - k6-network
+    profiles:
+      - monitoring
+
+  # Your application service (referenced from main docker-compose)
+  my-java-app:
+    image: my-java-app:${IMAGE_TAG:-latest}
+    container_name: my-java-app-k6-test
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILE:-test}
+      - JAVA_OPTS=-Xmx1024m -Xms512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - k6-network
+
+volumes:
+  grafana_data:
+  influxdb_data:
+
+networks:
+  k6-network:
+    driver: bridge

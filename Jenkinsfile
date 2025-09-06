@@ -187,6 +187,131 @@ pipeline {
             }
         }
         
+        stage('Performance Testing') {
+            when {
+                expression { params.RUN_PERFORMANCE_TESTS == true }
+            }
+            parallel {
+                stage('Load Testing - Development') {
+                    when {
+                        allOf {
+                            branch 'develop'
+                            expression { params.RUN_PERFORMANCE_TESTS == true }
+                        }
+                    }
+                    steps {
+                        script {
+                            runK6Tests('load', 'dev', 'http://localhost:8080')
+                        }
+                    }
+                    post {
+                        always {
+                            publishTestResults testsPattern: 'k6-tests/reports/k6-results.xml'
+                            archiveArtifacts artifacts: 'k6-tests/results/**', allowEmptyArchive: true
+                        }
+                    }
+                }
+                
+                stage('Performance Testing - Staging') {
+                    when {
+                        allOf {
+                            branch 'main'
+                            expression { params.RUN_PERFORMANCE_TESTS == true }
+                        }
+                    }
+                    steps {
+                        script {
+                            // Run comprehensive performance tests on staging
+                            runK6Tests('load', 'staging', 'http://staging.myapp.com')
+                            
+                            // Run stress test if load test passes
+                            if (currentBuild.result != 'FAILURE') {
+                                runK6Tests('stress', 'staging', 'http://staging.myapp.com')
+                            }
+                            
+                            // Run spike test if previous tests pass
+                            if (currentBuild.result != 'FAILURE') {
+                                runK6Tests('spike', 'staging', 'http://staging.myapp.com')
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            publishTestResults testsPattern: 'k6-tests/reports/k6-results.xml'
+                            archiveArtifacts artifacts: 'k6-tests/results/**', allowEmptyArchive: true
+                        }
+                        failure {
+                            script {
+                                sendNotification('PERFORMANCE_FAILURE')
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Performance Test Summary') {
+            when {
+                expression { params.RUN_PERFORMANCE_TESTS == true }
+            }
+            steps {
+                script {
+                    echo '📈 Performance Test Summary'
+                    
+                    // Collect and display performance test results
+                    try {
+                        bat 'dir k6-tests\\results'
+                        
+                        // Count test files
+                        def resultFiles = bat(
+                            script: 'dir /b k6-tests\\results\\*.json 2>nul | find /c /v ""',
+                            returnStdout: true
+                        ).trim()
+                        
+                        echo "Total k6 result files generated: ${resultFiles}"
+                        
+                        // Check if any reports were generated
+                        if (fileExists('k6-tests/reports/k6-results.xml')) {
+                            echo '✅ JUnit performance reports available'
+                        }
+                        
+                        // Archive all performance test artifacts
+                        archiveArtifacts artifacts: 'k6-tests/**', allowEmptyArchive: true
+                        
+                    } catch (Exception e) {
+                        echo "Could not generate performance test summary: ${e.message}"
+                    }
+                }
+            }
+        }
+        
+        stage('Pre-Production Performance Check') {
+            when {
+                allOf {
+                    branch 'main'
+                    expression { params.DEPLOY_TO_PRODUCTION == true }
+                }
+            }
+            steps {
+                script {
+                    echo 'Running production smoke test...'
+                    // Run minimal smoke test against production
+                    runK6Tests('smoke', 'production', 'https://prod.myapp.com')
+                }
+            }
+            post {
+                always {
+                    publishTestResults testsPattern: 'k6-tests/reports/k6-results.xml'
+                    archiveArtifacts artifacts: 'k6-tests/results/**', allowEmptyArchive: true
+                }
+                failure {
+                    script {
+                        sendNotification('PRODUCTION_SMOKE_TEST_FAILURE')
+                    }
+                }
+            }
+        }
+        
         stage('Production Deployment') {
             when {
                 allOf {
@@ -204,12 +329,23 @@ pipeline {
                                 name: 'DEPLOY_STRATEGY',
                                 choices: ['blue-green', 'rolling', 'recreate'],
                                 description: 'Select deployment strategy'
+                            ),
+                            booleanParam(
+                                name: 'RUN_PERFORMANCE_TESTS',
+                                defaultValue: false,
+                                description: 'Run performance tests after deployment'
                             )
                         ]
                     )
                     
-                    echo "Deploying to Production using ${userApproval} strategy..."
-                    deployToEnvironment('production', userApproval)
+                    echo "Deploying to Production using ${userApproval.DEPLOY_STRATEGY} strategy..."
+                    deployToEnvironment('production', userApproval.DEPLOY_STRATEGY)
+                    
+                    // Run post-deployment performance tests if requested
+                    if (userApproval.RUN_PERFORMANCE_TESTS) {
+                        echo 'Running post-deployment performance verification...'
+                        runK6Tests('smoke', 'production', 'https://prod.myapp.com')
+                    }
                 }
             }
         }
@@ -269,6 +405,16 @@ pipeline {
             defaultValue: false,
             description: 'Skip running tests'
         )
+        booleanParam(
+            name: 'RUN_PERFORMANCE_TESTS',
+            defaultValue: true,
+            description: 'Run k6 performance tests'
+        )
+        choice(
+            name: 'PERFORMANCE_TEST_TYPE',
+            choices: ['load', 'stress', 'spike', 'smoke'],
+            description: 'Type of performance test to run'
+        )
         string(
             name: 'DOCKER_TAG',
             defaultValue: '',
@@ -321,14 +467,177 @@ def deployToEnvironment(environment, strategy = 'rolling') {
     }
 }
 
+// Helper function for running k6 tests
+def runK6Tests(testType, environment, baseUrl) {
+    echo "🚀 Running k6 ${testType} tests against ${baseUrl}..."
+    echo "Environment: ${environment}"
+    echo "Test Type: ${testType}"
+    
+    // Ensure results and reports directories exist
+    bat """
+        if not exist "k6-tests\\results" mkdir "k6-tests\\results"
+        if not exist "k6-tests\\reports" mkdir "k6-tests\\reports"
+    """
+    
+    // Generate timestamp for unique result files
+    def timestamp = new Date().format('yyyyMMdd-HHmmss')
+    def resultFile = "results-${testType}-${environment}-${timestamp}.json"
+    
+    try {
+        // Verify test script exists
+        def scriptExists = fileExists("k6-tests/scripts/${testType}-test.js")
+        if (!scriptExists) {
+            error "k6 test script not found: k6-tests/scripts/${testType}-test.js"
+        }
+        
+        // Check if k6 is available
+        def k6Available = false
+        try {
+            timeout(time: 10, unit: 'SECONDS') {
+                bat 'k6 version > nul 2>&1'
+                k6Available = true
+                echo '✅ Using local k6 installation'
+            }
+        } catch (Exception e) {
+            echo '⚠️ k6 not found locally, will use Docker'
+        }
+        
+        // Set timeout based on test type
+        def testTimeout = getTestTimeout(testType)
+        echo "⏱️ Test timeout set to ${testTimeout} minutes"
+        
+        timeout(time: testTimeout, unit: 'MINUTES') {
+            if (k6Available) {
+                // Run k6 directly
+                echo '🏃 Running k6 test locally...'
+                bat """
+                    set BASE_URL=${baseUrl}
+                    set K6_ENVIRONMENT=${environment}
+                    k6 run --out json=k6-tests/results/${resultFile} k6-tests/scripts/${testType}-test.js
+                """
+            } else {
+                // Run k6 with Docker
+                echo '🐳 Running k6 test with Docker...'
+                bat """
+                    docker run --rm ^
+                        -v "%CD%\k6-tests\scripts:/scripts" ^
+                        -v "%CD%\k6-tests\results:/results" ^
+                        -e BASE_URL=${baseUrl} ^
+                        -e K6_ENVIRONMENT=${environment} ^
+                        grafana/k6:latest run ^
+                        --out json=/results/${resultFile} ^
+                        /scripts/${testType}-test.js
+                """
+            }
+        }
+        
+        // Verify results file was created
+        if (!fileExists("k6-tests/results/${resultFile}")) {
+            error "k6 test results file not found: ${resultFile}"
+        }
+        
+        // Process results and generate reports
+        echo '📊 Processing test results...'
+        timeout(time: 5, unit: 'MINUTES') {
+            bat """
+                powershell -ExecutionPolicy Bypass -File k6-tests/process-results.ps1 ^
+                    -ResultsPath "k6-tests/results" ^
+                    -OutputPath "k6-tests/reports" ^
+                    -Format junit
+            """
+        }
+        
+        // Verify JUnit report was generated
+        if (fileExists('k6-tests/reports/k6-results.xml')) {
+            echo '✅ JUnit report generated successfully'
+        } else {
+            echo '⚠️ JUnit report not found, but test may have completed'
+        }
+        
+        echo "✅ k6 ${testType} tests completed successfully"
+        
+    } catch (Exception e) {
+        echo "❌ k6 ${testType} tests failed: ${e.message}"
+        
+        // Try to collect any available results for debugging
+        try {
+            bat 'dir k6-tests\\results'
+            echo 'Available result files listed above'
+        } catch (Exception listException) {
+            echo 'Could not list result files'
+        }
+        
+        // Mark build as unstable instead of failure for performance tests
+        if (environment != 'production') {
+            currentBuild.result = 'UNSTABLE'
+            echo '⚠️ Performance test failed - marking build as unstable'
+        } else {
+            currentBuild.result = 'FAILURE'
+            echo '🚨 Production performance test failed - marking build as failure'
+            throw e
+        }
+    }
+}
+
+// Helper function to get test timeout based on test type
+def getTestTimeout(testType) {
+    switch(testType) {
+        case 'smoke':
+            return 5
+        case 'load':
+            return 20
+        case 'stress':
+            return 30
+        case 'spike':
+            return 15
+        default:
+            return 15
+    }
+}
+
 // Helper function for notifications
 def sendNotification(status) {
-    def color = status == 'SUCCESS' ? 'good' : (status == 'FAILURE' ? 'danger' : 'warning')
-    def message = """
-        Pipeline ${status}: ${env.JOB_NAME} - ${env.BUILD_NUMBER}
+    def color = 'good'
+    def emoji = '✅'
+    def message = ""
+    
+    switch(status) {
+        case 'SUCCESS':
+            color = 'good'
+            emoji = '✅'
+            message = "Pipeline completed successfully!"
+            break
+        case 'FAILURE':
+            color = 'danger'
+            emoji = '❌'
+            message = "Pipeline failed!"
+            break
+        case 'PERFORMANCE_FAILURE':
+            color = 'warning'
+            emoji = '⚠️'
+            message = "Performance tests failed! Check the results."
+            break
+        case 'PRODUCTION_SMOKE_TEST_FAILURE':
+            color = 'danger'
+            emoji = '🚨'
+            message = "Production smoke test failed! Deployment blocked."
+            break
+        default:
+            color = 'warning'
+            emoji = '⚠️'
+            message = "Pipeline completed with warnings"
+    }
+    
+    def fullMessage = """
+        ${emoji} ${message}
+        
+        Project: ${env.JOB_NAME}
+        Build: #${env.BUILD_NUMBER}
         Branch: ${env.BRANCH_NAME}
         Commit: ${env.GIT_COMMIT_SHORT}
-        Build URL: ${env.BUILD_URL}
+        
+        📊 Build URL: ${env.BUILD_URL}
+        📈 Performance Reports: ${env.BUILD_URL}artifact/k6-tests/reports/
     """
     
     // Slack notification (if configured)
@@ -336,7 +645,7 @@ def sendNotification(status) {
         slackSend(
             channel: '#deployments',
             color: color,
-            message: message
+            message: fullMessage
         )
     } catch (Exception e) {
         echo "Slack notification failed: ${e.message}"
@@ -345,8 +654,8 @@ def sendNotification(status) {
     // Email notification (if configured)
     try {
         emailext(
-            subject: "Pipeline ${status}: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
-            body: message,
+            subject: "${emoji} ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} - ${status}",
+            body: fullMessage,
             to: '${DEFAULT_RECIPIENTS}'
         )
     } catch (Exception e) {
