@@ -11,10 +11,9 @@ pipeline {
     }
     
     stages {
-        stage('Checkout') {
+        stage('Initialize') {
             steps {
-                echo 'Checking out source code...'
-                checkout scm
+                echo 'Initializing build environment...'
                 script {
                     env.GIT_COMMIT_SHORT = sh(
                         script: 'git rev-parse --short HEAD',
@@ -25,6 +24,7 @@ pipeline {
                     def version = (pom =~ /<version>([^<]+)<\/version>/)[0][1]
                     env.APP_VERSION = version
                     echo "Application version: ${env.APP_VERSION}"
+                    echo "Git commit: ${env.GIT_COMMIT_SHORT}"
                 }
             }
         }
