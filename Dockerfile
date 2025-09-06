@@ -1,5 +1,44 @@
+# Multi-stage build for optimization
+FROM openjdk:11-jdk-slim as build
+
+# Set working directory
+WORKDIR /workspace/app
+
+# Copy Maven files
+COPY pom.xml .
+COPY src src
+
+# Build the application (optional - can be done in Jenkins)
+# RUN ./mvnw install -DskipTests
+
+# Runtime stage
 FROM openjdk:11-jre-slim
+
+# Create app directory
 WORKDIR /app
-COPY target/my-java-app-1.0-SNAPSHOT.jar my-java-app.jar
-ENTRYPOINT ["java", "-cp", "my-java-app.jar", "com.example.App"]
+
+# Create non-root user for security
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+
+# Copy the jar file (version will be updated by Jenkins)
+COPY target/my-java-app-*.jar app.jar
+
+# Change ownership to non-root user
+RUN chown appuser:appgroup /app/app.jar
+
+# Switch to non-root user
+USER appuser
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+# Run the Spring Boot application
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+
+# Optional: Add JVM tuning parameters
+# ENTRYPOINT ["java", "-Xmx512m", "-Xms256m", "-jar", "/app/app.jar"]
 
