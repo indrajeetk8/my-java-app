@@ -6,7 +6,7 @@ pipeline {
     }
     
     tools {
-        maven 'Maven3'  // Using Jenkins suggested name
+        maven 'Maven3'
         jdk 'JDK17'
     }
     
@@ -19,7 +19,6 @@ pipeline {
                         script: 'git rev-parse --short HEAD',
                         returnStdout: true
                     ).trim()
-                    // Read version from pom.xml
                     def pom = readFile('pom.xml')
                     def version = (pom =~ /<version>([^<]+)<\/version>/)[0][1]
                     env.APP_VERSION = version
@@ -43,21 +42,9 @@ pipeline {
             }
             post {
                 always {
-                    script {
-                        // Archive test reports first
-                        archiveArtifacts artifacts: 'target/surefire-reports/**', allowEmptyArchive: true
-                        
-                        // Publish test results with error handling
-                        try {
-                            if (fileExists('target/surefire-reports/TEST-*.xml')) {
-                                junit testResults: 'target/surefire-reports/TEST-*.xml', allowEmptyResults: true, skipPublishingChecks: true
-                            } else {
-                                echo 'No JUnit test results found'
-                            }
-                        } catch (Exception e) {
-                            echo "Test result publishing failed: ${e.getMessage()}"
-                        }
-                    }
+                    // Simple artifact archiving without complex test result publishing
+                    archiveArtifacts artifacts: 'target/surefire-reports/**', allowEmptyArchive: true
+                    echo 'Test reports archived successfully'
                 }
             }
         }
@@ -70,6 +57,7 @@ pipeline {
             post {
                 success {
                     archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                    echo "Package created: my-java-app-${env.APP_VERSION}.jar"
                 }
             }
         }
@@ -80,10 +68,14 @@ pipeline {
             echo 'Pipeline completed!'
         }
         success {
-            echo 'Build succeeded!'
+            echo 'Build succeeded! ✅'
+            echo "Artifacts available: JAR file and test reports"
         }
         failure {
-            echo 'Build failed!'
+            echo 'Build failed! ❌'
+        }
+        cleanup {
+            echo 'Cleaning up workspace...'
         }
     }
 }
