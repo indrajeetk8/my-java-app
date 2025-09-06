@@ -16,13 +16,13 @@ pipeline {
                 echo 'Checking out source code...'
                 checkout scm
                 script {
-                    env.GIT_COMMIT_SHORT = sh(
+                    env.GIT_COMMIT_SHORT = bat(
                         script: 'git rev-parse --short HEAD',
                         returnStdout: true
                     ).trim()
                     // Read version from pom.xml
                     def pom = readFile('pom.xml')
-                    def version = (pom =~ /<version>([^<]+)<\/version>/)[0][1]
+                    def version = (pom =~ /<version>([^<]+)<\\/version>/)[0][1]
                     env.APP_VERSION = version
                     echo "Application version: ${env.APP_VERSION}"
                 }
@@ -32,14 +32,14 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building the application...'
-                sh 'mvn clean compile'
+                bat 'mvn clean compile'
             }
         }
         
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                sh 'mvn test'
+                bat 'mvn test'
             }
             post {
                 always {
@@ -52,7 +52,7 @@ pipeline {
         stage('Package') {
             steps {
                 echo 'Packaging the application...'
-                sh 'mvn package -DskipTests'
+                bat 'mvn package -DskipTests'
             }
             post {
                 success {
