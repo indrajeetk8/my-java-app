@@ -7,7 +7,7 @@ pipeline {
     }
     
     tools {
-        maven 'Maven'
+        maven 'Maven3'  // Using Jenkins suggested name
         jdk 'JDK17'
     }
     
