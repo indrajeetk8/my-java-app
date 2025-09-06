@@ -43,7 +43,7 @@ pipeline {
             }
             post {
                 always {
-                    publishTestResults testsPattern: 'target/surefire-reports/*.xml'
+                    junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
                     archiveArtifacts artifacts: 'target/surefire-reports/**', allowEmptyArchive: true
                 }
             }
