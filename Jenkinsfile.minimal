@@ -1,0 +1,81 @@
+pipeline {
+    agent any
+    
+    environment {
+        MAVEN_OPTS = '-Xmx1024m'
+    }
+    
+    tools {
+        maven 'Maven3'
+        jdk 'JDK17'
+    }
+    
+    stages {
+        stage('Initialize') {
+            steps {
+                echo 'Initializing build environment...'
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    def pom = readFile('pom.xml')
+                    def version = (pom =~ /<version>([^<]+)<\/version>/)[0][1]
+                    env.APP_VERSION = version
+                    echo "Application version: ${env.APP_VERSION}"
+                    echo "Git commit: ${env.GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                echo 'Building the application...'
+                sh 'mvn clean compile'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    // Simple artifact archiving without complex test result publishing
+                    archiveArtifacts artifacts: 'target/surefire-reports/**', allowEmptyArchive: true
+                    echo 'Test reports archived successfully'
+                }
+            }
+        }
+        
+        stage('Package') {
+            steps {
+                echo 'Packaging the application...'
+                sh 'mvn package -DskipTests'
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                    echo "Package created: my-java-app-${env.APP_VERSION}.jar"
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline completed!'
+        }
+        success {
+            echo 'Build succeeded! ✅'
+            echo "Artifacts available: JAR file and test reports"
+        }
+        failure {
+            echo 'Build failed! ❌'
+        }
+        cleanup {
+            echo 'Cleaning up workspace...'
+        }
+    }
+}

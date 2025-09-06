@@ -1,12 +1,20 @@
 package com.example;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@SpringBootTest
 public class AppTest {
 
     @Test
-    void testApp() {
+    void contextLoads() {
+        // Test that Spring context loads successfully
+        assertTrue(true, "Spring Boot context loaded successfully!");
+    }
+
+    @Test
+    void basicTest() {
         assertTrue(true, "Basic test passed!");
     }
 }

@@ -1,0 +1,109 @@
+pipeline {
+    agent any
+    
+    environment {
+        MAVEN_OPTS = '-Xmx1024m'
+    }
+    
+    tools {
+        maven 'Maven3'
+        jdk 'JDK17'
+    }
+    
+    stages {
+        stage('Initialize') {
+            steps {
+                echo 'Initializing build environment...'
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    def pom = readFile('pom.xml')
+                    def version = (pom =~ /<version>([^<]+)<\/version>/)[0][1]
+                    env.APP_VERSION = version
+                    echo "Application version: ${env.APP_VERSION}"
+                    echo "Git commit: ${env.GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                echo 'Building the application...'
+                sh 'mvn clean compile'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                script {
+                    try {
+                        sh 'mvn test'
+                        echo "✅ All tests passed!"
+                    } catch (Exception e) {
+                        echo "⚠️ Some tests failed, but continuing build: ${e.getMessage()}"
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
+            }
+            post {
+                always {
+                    script {
+                        // Always archive test reports
+                        if (fileExists('target/surefire-reports')) {
+                            archiveArtifacts artifacts: 'target/surefire-reports/**', allowEmptyArchive: true
+                            echo 'Test reports archived'
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Package') {
+            steps {
+                echo 'Packaging the application...'
+                sh 'mvn package -DskipTests'
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                    echo "✅ Package created: my-java-app-${env.APP_VERSION}.jar"
+                }
+            }
+        }
+        
+        stage('Summary') {
+            steps {
+                script {
+                    echo "=== BUILD SUMMARY ==="
+                    echo "📦 Application: my-java-app-${env.APP_VERSION}"
+                    echo "🔗 Git commit: ${env.GIT_COMMIT_SHORT}"
+                    echo "📁 Artifacts: JAR file and test reports"
+                    
+                    if (currentBuild.result == 'UNSTABLE') {
+                        echo "⚠️ Status: UNSTABLE (tests failed but build completed)"
+                    } else {
+                        echo "✅ Status: SUCCESS"
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline completed!'
+        }
+        success {
+            echo '🎉 Build succeeded completely!'
+        }
+        unstable {
+            echo '⚠️ Build completed but with test failures'
+        }
+        failure {
+            echo '❌ Build failed!'
+        }
+    }
+}

@@ -1,0 +1,97 @@
+pipeline {
+    agent any
+    
+    environment {
+        MAVEN_OPTS = '-Xmx1024m'
+    }
+    
+    tools {
+        maven 'Maven3'  // Using Jenkins suggested name
+        jdk 'JDK17'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    // Read version from pom.xml
+                    def pom = readFile('pom.xml')
+                    def version = (pom =~ /<version>([^<]+)<\/version>/)[0][1]
+                    env.APP_VERSION = version
+                    echo "Application version: ${env.APP_VERSION}"
+                    echo "Git commit: ${env.GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                echo 'Building the application...'
+                sh 'mvn clean compile'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                script {
+                    try {
+                        sh 'mvn test'
+                    } catch (Exception e) {
+                        echo "Tests failed but continuing pipeline: ${e.getMessage()}"
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
+            }
+            post {
+                always {
+                    script {
+                        // Check if test results exist before publishing
+                        if (fileExists('target/surefire-reports/*.xml')) {
+                            junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
+                        } else {
+                            echo 'No test results found to publish'
+                        }
+                    }
+                    archiveArtifacts artifacts: 'target/surefire-reports/**', allowEmptyArchive: true
+                }
+            }
+        }
+        
+        stage('Package') {
+            steps {
+                echo 'Packaging the application...'
+                sh 'mvn package -DskipTests'
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline completed!'
+        }
+        success {
+            echo 'Build succeeded!'
+        }
+        unstable {
+            echo 'Build completed with test failures!'
+        }
+        failure {
+            echo 'Build failed!'
+        }
+        cleanup {
+            echo 'Cleaning up...'
+        }
+    }
+}
