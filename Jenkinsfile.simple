@@ -1,0 +1,102 @@
+pipeline {
+    agent {
+        docker {
+            image 'maven:3.8.6-openjdk-17-slim'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
+    
+    environment {
+        MAVEN_OPTS = '-Xmx1024m'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    // Read version from pom.xml
+                    def pom = readFile('pom.xml')
+                    def version = (pom =~ /<version>([^<]+)<\/version>/)[0][1]
+                    env.APP_VERSION = version
+                    echo "Application version: ${env.APP_VERSION}"
+                    echo "Git commit: ${env.GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                echo 'Building the application...'
+                sh 'mvn clean compile'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    publishTestResults testsPattern: 'target/surefire-reports/*.xml'
+                    archiveArtifacts artifacts: 'target/surefire-reports/**', allowEmptyArchive: true
+                }
+            }
+        }
+        
+        stage('Code Quality') {
+            parallel {
+                stage('Checkstyle') {
+                    steps {
+                        echo 'Running Checkstyle analysis...'
+                        sh 'mvn checkstyle:check || true'
+                    }
+                }
+                stage('SpotBugs') {
+                    steps {
+                        echo 'Running SpotBugs analysis...'
+                        sh 'mvn compile spotbugs:check || true'
+                    }
+                }
+            }
+        }
+        
+        stage('Package') {
+            steps {
+                echo 'Packaging the application...'
+                sh 'mvn package -DskipTests'
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline completed!'
+            // Generate reports
+            publishTestResults testsPattern: 'target/surefire-reports/*.xml'
+        }
+        success {
+            echo 'Build succeeded!'
+        }
+        failure {
+            echo 'Build failed!'
+            // Archive logs for debugging
+            archiveArtifacts artifacts: 'target/surefire-reports/**', allowEmptyArchive: true
+        }
+        cleanup {
+            // Clean up workspace
+            cleanWs()
+        }
+    }
+}

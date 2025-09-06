@@ -1,0 +1,118 @@
+pipeline {
+    agent any
+    
+    environment {
+        // Maven settings
+        MAVEN_OPTS = '-Xmx1024m'
+        // Docker registry (customize as needed)
+        DOCKER_REGISTRY = 'localhost:5000' // or your registry URL
+        DOCKER_IMAGE = "my-java-app"
+        // Nexus credentials (store in Jenkins credentials)
+        NEXUS_CREDENTIALS = credentials('nexus-credentials')
+        // Application version from pom.xml
+        APP_VERSION = readMavenPom().getVersion()
+    }
+    
+    // No tools section - uses system PATH
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+                script {
+                    // Get commit info for build metadata
+                    env.GIT_COMMIT_SHORT = bat(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    env.BUILD_TIMESTAMP = new Date().format('yyyyMMdd-HHmmss')
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                echo 'Building the application...'
+                bat 'mvn clean compile'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                bat 'mvn test'
+            }
+            post {
+                always {
+                    // Publish test results
+                    publishTestResults testsPattern: 'target/surefire-reports/*.xml'
+                    // Archive test reports
+                    archiveArtifacts artifacts: 'target/surefire-reports/**', allowEmptyArchive: true
+                }
+            }
+        }
+        
+        stage('Code Quality Analysis') {
+            parallel {
+                stage('SpotBugs') {
+                    steps {
+                        echo 'Running SpotBugs analysis...'
+                        bat 'mvn compile spotbugs:check || exit 0'
+                    }
+                }
+                stage('Checkstyle') {
+                    steps {
+                        echo 'Running Checkstyle analysis...'
+                        bat 'mvn checkstyle:check || exit 0'
+                    }
+                }
+            }
+        }
+        
+        stage('Package') {
+            steps {
+                echo 'Packaging the application...'
+                bat 'mvn package -DskipTests'
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                }
+            }
+        }
+        
+        stage('Docker Build') {
+            steps {
+                script {
+                    echo 'Building Docker image...'
+                    def dockerImage = docker.build("${DOCKER_IMAGE}:${APP_VERSION}-${GIT_COMMIT_SHORT}")
+                    
+                    // Tag with latest if on main branch
+                    if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
+                        dockerImage.tag('latest')
+                    }
+                    
+                    // Store image ID for later use
+                    env.DOCKER_IMAGE_ID = dockerImage.id
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Cleaning up workspace...'
+            // Clean workspace
+            cleanWs()
+        }
+        
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}

@@ -1,0 +1,34 @@
+FROM jenkins/jenkins:lts
+
+# Switch to root user to install packages
+USER root
+
+# Install Maven, Git, and other essential tools
+RUN apt-get update && apt-get install -y \
+    maven \
+    git \
+    curl \
+    wget \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify installations
+RUN mvn --version && git --version && java -version
+
+# Install Docker CLI (for Docker pipeline plugin)
+RUN curl -fsSL https://get.docker.com -o get-docker.sh && \
+    sh get-docker.sh && \
+    rm get-docker.sh
+
+# Switch back to jenkins user
+USER jenkins
+
+# Copy plugins list and install them
+COPY --chown=jenkins:jenkins jenkins-plugins.txt /usr/share/jenkins/ref/plugins.txt
+RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
+
+# Skip initial setup wizard
+ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
+
+# Expose ports
+EXPOSE 8080 50000
