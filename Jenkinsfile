@@ -3,7 +3,6 @@ pipeline {
     
     environment {
         MAVEN_OPTS = '-Xmx1024m'
-        APP_VERSION = readMavenPom().getVersion()
     }
     
     tools {
@@ -21,6 +20,11 @@ pipeline {
                         script: 'git rev-parse --short HEAD',
                         returnStdout: true
                     ).trim()
+                    // Read version from pom.xml
+                    def pom = readFile('pom.xml')
+                    def version = (pom =~ /<version>([^<]+)<\/version>/)[0][1]
+                    env.APP_VERSION = version
+                    echo "Application version: ${env.APP_VERSION}"
                 }
             }
         }
@@ -61,7 +65,6 @@ pipeline {
     post {
         always {
             echo 'Pipeline completed!'
-            cleanWs()
         }
         success {
             echo 'Build succeeded!'
