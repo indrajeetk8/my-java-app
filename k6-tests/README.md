@@ -79,21 +79,39 @@ k6-tests/
 ```
 
 #### Using Docker Directly
-```powershell
+```bash
 # Run load test with Docker
-docker run --rm `
-  -v "${PWD}\scripts:/scripts" `
-  -v "${PWD}\results:/results" `
-  -e BASE_URL=http://localhost:8080 `
-  grafana/k6:latest run `
-  --out json=/results/results.json `
+docker run --rm \
+  -v "${PWD}/scripts:/scripts" \
+  -v "${PWD}/results:/results" \
+  -e BASE_URL=http://localhost:8080 \
+  grafana/k6:latest run \
+  --out json=/results/results.json \
   /scripts/load-test.js
+
+# Run smoke test with Docker  
+docker run --rm \
+  -v "${PWD}/scripts:/scripts" \
+  -e BASE_URL=http://localhost:8080 \
+  grafana/k6:latest run /scripts/smoke-test.js
+
+# Run stress test with Docker
+docker run --rm \
+  -v "${PWD}/scripts:/scripts" \
+  -e BASE_URL=http://localhost:8080 \
+  grafana/k6:latest run /scripts/stress-test.js
 ```
 
 #### Using k6 Directly (if installed)
-```powershell
-$env:BASE_URL = "http://localhost:8080"
+```bash
+# Set environment variable and run load test
+export BASE_URL="http://localhost:8080"
 k6 run --out json=results/results.json scripts/load-test.js
+
+# Run different test types
+k6 run scripts/smoke-test.js
+k6 run scripts/stress-test.js
+k6 run scripts/spike-test.js
 ```
 
 ### CI/CD Pipeline Integration
