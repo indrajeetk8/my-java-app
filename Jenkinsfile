@@ -8,7 +8,7 @@ pipeline {
         DOCKER_REGISTRY = 'localhost:5000' // or your registry URL
         DOCKER_IMAGE = "my-java-app"
         // Nexus credentials (store in Jenkins credentials)
-        NEXUS_CREDENTIALS = credentials('nexus-credentials')
+        // NEXUS_CREDENTIALS = credentials('nexus-credentials') // Commented out until configured
         // Application version from pom.xml
         APP_VERSION = readMavenPom().getVersion()
     }
@@ -37,14 +37,14 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building the application...'
-                bat 'mvn clean compile'
+                sh 'mvn clean compile'
             }
         }
         
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                bat 'mvn test'
+                sh 'mvn test'
             }
             post {
                 always {
@@ -61,13 +61,13 @@ pipeline {
                 stage('SpotBugs') {
                     steps {
                         echo 'Running SpotBugs analysis...'
-                        bat 'mvn compile spotbugs:check || exit 0'
+                        sh 'mvn compile spotbugs:check || true'
                     }
                 }
                 stage('Checkstyle') {
                     steps {
                         echo 'Running Checkstyle analysis...'
-                        bat 'mvn checkstyle:check || exit 0'
+                        sh 'mvn checkstyle:check || true'
                     }
                 }
             }
@@ -76,7 +76,7 @@ pipeline {
         stage('Package') {
             steps {
                 echo 'Packaging the application...'
-                bat 'mvn package -DskipTests'
+                sh 'mvn package -DskipTests'
             }
             post {
                 success {
@@ -108,9 +108,9 @@ pipeline {
                     echo 'Running security scan on Docker image...'
                     // Using Trivy for vulnerability scanning (install Trivy on Jenkins agent)
                     try {
-                        bat "trivy image --exit-code 0 --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${APP_VERSION}-${GIT_COMMIT_SHORT}"
+                        sh "trivy image --exit-code 0 --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${APP_VERSION}-${GIT_COMMIT_SHORT} || true"
                     } catch (Exception e) {
-                        echo 'Security scan completed with warnings. Check logs for details.'
+                        echo 'Security scan completed with warnings or Trivy not available. Check logs for details.'
                     }
                 }
             }
@@ -125,16 +125,17 @@ pipeline {
                 }
             }
             steps {
-                echo 'Deploying artifact to Nexus Repository...'
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'nexus-credentials',
-                        usernameVariable: 'NEXUS_USERNAME',
-                        passwordVariable: 'NEXUS_PASSWORD'
-                    )
-                ]) {
-                    bat 'mvn deploy -DskipTests'
-                }
+                echo 'Skipping Nexus deployment - credentials not configured'
+                echo 'To enable: Configure nexus-credentials in Jenkins'
+                // withCredentials([
+                //     usernamePassword(
+                //         credentialsId: 'nexus-credentials',
+                //         usernameVariable: 'NEXUS_USERNAME',
+                //         passwordVariable: 'NEXUS_PASSWORD'
+                //     )
+                // ]) {
+                //     sh 'mvn deploy -DskipTests'
+                // }
             }
         }
         
@@ -147,12 +148,13 @@ pipeline {
             }
             steps {
                 script {
-                    echo 'Pushing Docker image to registry...'
-                    docker.withRegistry("http://${DOCKER_REGISTRY}", 'docker-registry-credentials') {
-                        def image = docker.image("${DOCKER_IMAGE}:${APP_VERSION}-${GIT_COMMIT_SHORT}")
-                        image.push()
-                        image.push('latest')
-                    }
+                    echo 'Skipping Docker registry push - credentials not configured'
+                    echo 'To enable: Configure docker-registry-credentials in Jenkins'
+                    // docker.withRegistry("http://${DOCKER_REGISTRY}", 'docker-registry-credentials') {
+                    //     def image = docker.image("${DOCKER_IMAGE}:${APP_VERSION}-${GIT_COMMIT_SHORT}")
+                    //     image.push()
+                    //     image.push('latest')
+                    // }
                 }
             }
         }

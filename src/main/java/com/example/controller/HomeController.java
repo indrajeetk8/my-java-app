@@ -20,7 +20,7 @@ public class HomeController {
      * @param model the model to add attributes to
      * @return the view name
      */
-    @GetMapping("/")
+    @GetMapping("/home")
     public String home(final Model model) {
         model.addAttribute("title", "My Java Web App");
         model.addAttribute("message", "Welcome to My Java Spring Boot Application!");
@@ -30,10 +30,10 @@ public class HomeController {
     }
 
     /**
-     * Status API endpoint.
+     * Web Status API endpoint.
      * @return JSON status response
      */
-    @GetMapping("/api/status")
+    @GetMapping("/api/web-status")
     @ResponseBody
     public String status() {
         final String timestamp = LocalDateTime.now()

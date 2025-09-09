@@ -1,5 +1,5 @@
 # Multi-stage build for optimization
-FROM openjdk:11-jdk-slim as build
+FROM eclipse-temurin:17-jdk-alpine as build
 
 # Set working directory
 WORKDIR /workspace/app
@@ -12,13 +12,15 @@ COPY src src
 # RUN ./mvnw install -DskipTests
 
 # Runtime stage
-FROM openjdk:11-jre-slim
+FROM eclipse-temurin:17-jre-alpine
 
 # Create app directory
 WORKDIR /app
 
-# Create non-root user for security
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+# Create non-root user for security and install curl for health check
+RUN apk add --no-cache curl && \
+    addgroup -S appgroup && \
+    adduser -S -G appgroup appuser
 
 # Copy the jar file (version will be updated by Jenkins)
 COPY target/my-java-app-*.jar app.jar
