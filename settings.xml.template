@@ -17,15 +17,15 @@
         <!-- Nexus Release Repository Authentication -->
         <server>
             <id>nexus-releases</id>
-            <username>{{NEXUS_USERNAME}}</username>
-            <password>{{NEXUS_PASSWORD}}</password>
+            <username>admin</username>
+            <password>123456</password>
         </server>
         
         <!-- Nexus Snapshot Repository Authentication -->
         <server>
             <id>nexus-snapshots</id>
-            <username>{{NEXUS_USERNAME}}</username>
-            <password>{{NEXUS_PASSWORD}}</password>
+            <username>admin</username>
+            <password>123456</password>
         </server>
     </servers>
 
