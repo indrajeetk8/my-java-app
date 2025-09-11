@@ -1,66 +1,19 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Maven Settings Template for Nexus Deployment
-  
-  Instructions:
-  1. Copy this file to ~/.m2/settings.xml
-  2. Replace {{NEXUS_USERNAME}} and {{NEXUS_PASSWORD}} with actual credentials
-  3. Update repository URLs if your Nexus server is not on localhost:8081
--->
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 
-          http://maven.apache.org/xsd/settings-1.0.0.xsd">
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                              https://maven.apache.org/xsd/settings-1.0.0.xsd">
 
-    <!-- Authentication for repositories -->
-    <servers>
-        <!-- Nexus Release Repository Authentication -->
-        <server>
-            <id>nexus-releases</id>
-            <username>admin</username>
-            <password>123456</password>
-        </server>
-        
-        <!-- Nexus Snapshot Repository Authentication -->
-        <server>
-            <id>nexus-snapshots</id>
-            <username>admin</username>
-            <password>123456</password>
-        </server>
-    </servers>
-
-    <!-- Repository profiles -->
-    <profiles>
-        <profile>
-            <id>nexus</id>
-            <repositories>
-                <repository>
-                    <id>nexus-releases</id>
-                    <url>http://localhost:8081/repository/maven-releases/</url>
-                    <releases>
-                        <enabled>true</enabled>
-                    </releases>
-                    <snapshots>
-                        <enabled>false</enabled>
-                    </snapshots>
-                </repository>
-                <repository>
-                    <id>nexus-snapshots</id>
-                    <url>http://localhost:8081/repository/maven-snapshots/</url>
-                    <releases>
-                        <enabled>false</enabled>
-                    </releases>
-                    <snapshots>
-                        <enabled>true</enabled>
-                    </snapshots>
-                </repository>
-            </repositories>
-        </profile>
-    </profiles>
-
-    <!-- Activate profiles -->
-    <activeProfiles>
-        <activeProfile>nexus</activeProfile>
-    </activeProfiles>
+  <servers>
+    <server>
+      <id>nexus-snapshots</id>
+      <username>${env.NEXUS_USERNAME}</username>
+      <password>${env.NEXUS_PASSWORD}</password>
+    </server>
+    <server>
+      <id>nexus-releases</id>
+      <username>${env.NEXUS_USERNAME}</username>
+      <password>${env.NEXUS_PASSWORD}</password>
+    </server>
+  </servers>
 
 </settings>
