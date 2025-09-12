@@ -21,7 +21,7 @@ services:
     networks:
       - k6-network
 
-  # Optional: Grafana for k6 results visualization
+  # Optional: Grafana for k6 results visualization  ok
   grafana:
     image: grafana/grafana:latest
     container_name: k6-grafana
