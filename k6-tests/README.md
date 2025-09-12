@@ -18,7 +18,6 @@ k6-tests/
 │   ├── load-test.js   # Standard load testing
 │   ├── stress-test.js # Stress testing (finding limits)
 │   ├── spike-test.js  # Spike testing (sudden load increases)
-│   └── smoke-test.js  # Smoke testing (basic functionality)
 ├── configs/           # Environment-specific configurations
 │   ├── dev.json       # Development environment config
 │   ├── staging.json   # Staging environment config
