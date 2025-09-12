@@ -8,7 +8,7 @@ WORKDIR /workspace/app
 COPY pom.xml .
 COPY src src
 
-# Build the application (optional - can be done in Jenkins)
+# Build the application (optional - can be done in Jenkins ok )
 # RUN ./mvnw install -DskipTests
 
 # Runtime stage
