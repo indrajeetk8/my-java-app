@@ -91,7 +91,7 @@ pipeline {
                     echo 'Building Docker image...'
                     def dockerImage = docker.build("${DOCKER_IMAGE}:${APP_VERSION}-${GIT_COMMIT_SHORT}")
                     
-                    // Tag with latest if on main branch
+                    // Tag with latest if on main branch  ok
                     if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
                         dockerImage.tag('latest')
                     }
