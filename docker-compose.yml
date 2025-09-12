@@ -18,7 +18,7 @@ services:
     networks:
       - devops-network
 
-  # SonarQube Service
+  # SonarQube Service   ,
   sonarqube:
     image: sonarqube:community
     container_name: sonarqube
