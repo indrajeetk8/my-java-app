@@ -67,7 +67,7 @@ services:
     networks:
       - devops-network
 
-  # Trivy Server (for vulnerability scanning)
+  # Trivy Server (for vulnerability scanning) dd
   trivy:
     image: aquasec/trivy:latest
     container_name: trivy
