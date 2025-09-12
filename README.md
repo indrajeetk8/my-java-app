@@ -12,7 +12,6 @@ A simple Java application with Maven build system and Nexus repository deploymen
 ## 🚀 Quick Start
 
 ### 1. Clone and Build
-```bash
 git clone <your-repo-url>
 cd my-java-app
 mvn clean compile
