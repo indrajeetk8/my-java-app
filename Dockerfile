@@ -17,7 +17,7 @@ FROM eclipse-temurin:17-jre-alpine
 # Create app directory
 WORKDIR /app
 
-# Create non-root user for security and install curl for health check
+# Create non-root user for security and install curl for health ok check
 RUN apk add --no-cache curl && \
     addgroup -S appgroup && \
     adduser -S -G appgroup appuser
