@@ -14,8 +14,8 @@ pipeline {
     }
     
     tools {
-        maven 'maven3' // Use the default Maven installation name
-        jdk 'jdk17'   // Use the available JDK installation name
+        maven 'maven3' // Use the default Maven installation name  
+        jdk 'jdk17'   // Use the available JDK installation name    
     }
     
     stages {
