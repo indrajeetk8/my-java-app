@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: javavist-deployment
+  labels:
+    app: javavist
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: javavist
+  template:
+    metadata:
+      labels:
+        app: javavist
+    spec:
+      containers:
+        - name: javavist-container
+          image: indrajeetk8/my-java-app-image:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: javavist-service
+spec:
+  selector:
+    app: javavist
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: NodePort
