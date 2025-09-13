@@ -19,7 +19,7 @@ spec:
           image: indrajeetk8/my-java-app-image:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 8080
+            - containerPort: 1000
 ---
 apiVersion: v1
 kind: Service
@@ -31,5 +31,5 @@ spec:
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 8080
+      targetPort: 1000
   type: NodePort
