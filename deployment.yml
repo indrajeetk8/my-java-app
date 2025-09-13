@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: javavist-deployment
+  name: my-java-app
   labels:
     app: javavist
 spec:
@@ -15,7 +15,7 @@ spec:
         app: javavist
     spec:
       containers:
-        - name: javavist-container
+        - name: my-java-app
           image: indrajeetk8/my-java-app-image:latest
           imagePullPolicy: Always
           ports:
@@ -24,7 +24,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: javavist-service
+  name: my-java-app
 spec:
   selector:
     app: javavist
