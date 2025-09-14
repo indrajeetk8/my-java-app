@@ -3,16 +3,16 @@ kind: Deployment
 metadata:
   name: my-java-app
   labels:
-    app: javavist
+    app: my-java-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: javavist
+      app: my-java-app
   template:
     metadata:
       labels:
-        app: javavist
+        app: my-java-app
     spec:
       containers:
         - name: my-java-app
@@ -27,7 +27,7 @@ metadata:
   name: my-java-app
 spec:
   selector:
-    app: javavist
+    app: my-java-app
   ports:
     - protocol: TCP
       port: 80
